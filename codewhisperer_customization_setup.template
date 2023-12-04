@@ -1,0 +1,102 @@
+Parameters:
+  SSOInstanceArn:
+    Description: 'The ARN of your IAM Identity Center instance.'
+    Type: String
+  WhisperAdminGroupPrincipalId:
+    Description: 'The GUID of the Group of CodeWhisperer administrators.'
+    Type: String
+    MinLength: '1'
+    MaxLength: '47' 
+    AllowedPattern: '^([0-9a-f]{10}-|)[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}$'
+    ConstraintDescription: 'The Group PrincipalId must be a valid GUID.'
+
+Resources:
+
+
+  WhisperCustomPermissionSet:
+    Type: AWS::SSO::PermissionSet
+    Properties:
+      Description: 'Gives the CodeWhisperer admin permission to administer customizations.'
+      InlinePolicy: |
+        {
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Allow",
+            "Action": [
+                "sso-directory:DescribeUsers"
+            ],
+            "Resource": [
+                "*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "codewhisperer:CreateCustomization",
+                "codewhisperer:DeleteCustomization",
+                "codewhisperer:ListCustomizations",
+                "codewhisperer:UpdateCustomization",
+                "codewhisperer:GetCustomization",
+                "codewhisperer:ListCustomizationPermissions",
+                "codewhisperer:AssociateCustomizationPermission",
+                "codewhisperer:DisassociateCustomizationPermission"
+            ],
+            "Resource": [
+                "*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "codestar-connections:ListConnections",
+                "codestar-connections:ListOwners",
+                "codestar-connections:ListRepositories",
+                "codestar-connections:GetConnection"
+            ],
+            "Resource": [
+                "*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": "codestar-connections:UseConnection",
+            "Resource": "*",
+            "Condition": {
+                "ForAnyValue:StringEquals": {
+                    "codestar-connections:ProviderAction": [
+                        "GitPull",
+                        "ListRepositories",
+                        "ListOwners"
+                    ]
+                }
+            }
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject*",
+                "s3:GetBucket*",
+                "s3:ListBucket*"
+            ],
+            "Resource": [
+                "*"
+            ]
+        }
+        ]
+        }
+      InstanceArn: !Ref SSOInstanceArn
+      Name: whisper_custom
+
+
+
+  WhisperAdminAssignment:
+      Type: AWS::SSO::Assignment  # assign the CodeWhisper admins the customizations permissions
+      Properties:
+        InstanceArn: !Ref SSOInstanceArn # the IAM Identity Center
+        PermissionSetArn: !GetAtt WhisperCustomPermissionSet.PermissionSetArn # the CodeWhisperer customization permission set
+        TargetId: !Sub '${AWS::AccountId}' # the AWS account
+        TargetType: 'AWS_ACCOUNT'
+        PrincipalType: 'GROUP'
+        PrincipalId: !Ref WhisperAdminGroupPrincipalId #the CodeWhisperer admin group
+
+
